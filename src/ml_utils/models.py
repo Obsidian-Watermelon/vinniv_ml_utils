@@ -56,7 +56,7 @@ class MLP(nn.Module):
         return self.classifier(pooled)
 
 
-class IMDBTransformer(nn.Module):
+class Transformer(nn.Module):
     """Transformer encoder classifier with positional embeddings."""
 
     def __init__(
