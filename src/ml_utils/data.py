@@ -1,5 +1,5 @@
 
-import torch, nbformat
+import torch, nbformat, re
 from torchtext import data
 from pathlib import Path
 
@@ -102,4 +102,69 @@ def load_notebook(path):
             "source": str(path),
         })
 
+    return documents
+
+def notebook_to_documents(cells):
+    ATX = re.compile(r"^ {0,3}#{1,6}(?:[ \t]+|$)")
+    SETEXT = re.compile(r"^ {0,3}(?:=+|-+)[ \t]*$")
+
+    def is_heading(line1: str, line2: str) -> bool:
+        return ATX.match(line1) or SETEXT.match(line2)
+    
+    documents = []
+    texts = []
+    title = ""
+    source = ""
+    indices = []
+    
+    for cell in cells:
+        indices.append(cell['cell_index'])
+        lines = cell['text'].splitlines()
+        
+        for i, line in enumerate(lines):
+            if len(indices) < 1:
+                indices.append(cell['cell_index'])
+                
+            if SETEXT.match(line):
+                # Skip header markup lines
+                continue
+            
+            if i+1 == len(lines) and len(title) > 0:
+                # Last line so append and break
+                texts.append(line)
+                continue
+            
+            line_is_heading = cell['cell_type'] == 'markdown' and is_heading(line, lines[i+1])
+            
+            if len(title) > 0 and line_is_heading:
+                # New header so create new document
+                documents.append({
+                    'text': '\n\n'.join(texts).strip("\n"),
+                    'title': title,
+                    'source': source,
+                    'cell_indices': indices
+                })
+                texts = []
+                title = ""
+                source = ""
+                indices = []
+            
+            if line_is_heading:
+                # Add the header and skip to new line
+                title = ATX.sub("", line)
+                source = cell['source']
+                continue
+            
+            if len(title) < 1:
+                # Don't add text without title
+                continue
+
+            texts.append(line)
+            
+    documents.append({
+        'text': '\n\n'.join(texts).strip("\n"),
+        'title': title,
+        'source': source,
+        'cell_indices': indices
+    })
     return documents
