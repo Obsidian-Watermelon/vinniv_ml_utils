@@ -1,6 +1,7 @@
 
-import torch
+import torch, nbformat
 from torchtext import data
+from pathlib import Path
 
 
 def handle_cuda_as_device() -> torch.device:
@@ -53,3 +54,24 @@ def get_bucket_iterators(
         sort_within_batch=True,
         device=device,
     )
+    
+def load_notebook(path):
+    notebook = nbformat.read(path, as_version=4)
+    documents = []
+
+    for i, cell in enumerate(notebook.cells):
+        if cell.cell_type not in {"markdown", "code"}:
+            continue
+
+        content = cell.source.strip()
+        if not content:
+            continue
+
+        documents.append({
+            "text": content,
+            "cell_type": cell.cell_type,
+            "cell_index": i,
+            "source": str(path),
+        })
+
+    return documents
