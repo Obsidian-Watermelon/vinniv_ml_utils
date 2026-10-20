@@ -19,4 +19,5 @@ __all__ = [
     "valid_step",
     "set_seed",
     "show_summary",
+    "load_notebook",
 ]
