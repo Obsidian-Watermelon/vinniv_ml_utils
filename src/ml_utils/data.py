@@ -56,6 +56,34 @@ def get_bucket_iterators(
     )
     
 def load_notebook(path):
+    """
+    Load a Jupyter notebook and extract its Markdown and code cells.
+
+    Reads a `.ipynb` file and converts each non-empty Markdown or code
+    cell into a dictionary containing the cell's text, type, index, and
+    source file path. Empty cells and other cell types are skipped.
+
+    Args:
+        path (str | pathlib.Path): Path to the Jupyter notebook file.
+
+    Returns:
+        list[dict]: A list of dictionaries, one per extracted cell.
+            Each dictionary contains:
+                - "text" (str): The cell's source content.
+                - "cell_type" (str): Either "markdown" or "code".
+                - "cell_index" (int): The cell's index in the notebook.
+                - "source" (str): Path to the notebook file.
+
+    Raises:
+        FileNotFoundError: If the specified notebook file does not exist.
+        OSError: If the file cannot be read.
+        nbformat.reader.NotJSONError: If the file is not valid notebook JSON.
+
+    Example:
+        >>> from pathlib import Path
+        >>> documents = load_notebook(Path("tutorial.ipynb"))
+        >>> print(documents[0]["text"])
+    """
     notebook = nbformat.read(path, as_version=4)
     documents = []
 
