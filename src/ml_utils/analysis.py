@@ -1,11 +1,11 @@
 
 from collections.abc import Iterable
-
 import matplotlib.pyplot as plt
 import pandas as pd
 import torch
 from torch import nn
 from tqdm.auto import tqdm
+from IPython.display import Markdown, display
 
 
 def plot_loss_curves(results: dict) -> tuple:
@@ -161,3 +161,7 @@ def get_best_result(results: dict) -> dict:
     )
 
     return {best_key: results[best_key]}
+
+def display_markdown(text: str):
+    """Display input text as markdown text"""
+    display(Markdown(text))

@@ -2,6 +2,7 @@
 import torch, nbformat, re
 from torchtext import data
 from pathlib import Path
+from urllib.parse import urljoin
 
 
 def handle_cuda_as_device() -> torch.device:
@@ -105,17 +106,66 @@ def load_notebook(path):
     return documents
 
 def notebook_to_documents(cells):
+    """
+    Convert extracted notebook cells into section-based documents for RAG.
+
+    Groups notebook content under Markdown headings and creates one document
+    for each section. Content appearing before the first recognized heading
+    is ignored. Heading markup is excluded from the document text, while
+    the heading text is stored as the document title.
+
+    Args:
+        cells (Iterable[dict]): Notebook cells produced by `load_notebook()`.
+            Each cell is expected to contain:
+                - text (str): The cell's source text.
+                - cell_type (str): The cell type, such as "markdown" or "code".
+                - cell_index (int): The cell's index in the original notebook.
+                - source (str): The path or identifier of the source notebook.
+
+    Returns:
+        list[dict]: A list of documents. Each document contains:
+            - text (str): The section's content, with collected lines joined
+              by blank lines.
+            - title (str): The Markdown heading identifying the section.
+            - source (str): The source notebook path or identifier.
+            - cell_indices (list[int]): Indices of notebook cells associated
+              with the section.
+
+    Notes:
+        - Recognizes ATX headings (# Heading) and Setext headings
+          (underlined with equals signs or hyphens).
+        - Setext underline lines are excluded from the document content.
+        - Only headings in Markdown cells start new sections.
+        - The function does not split sections into size-limited chunks.
+        - The returned list includes a final document even if its content
+          or title is empty.
+
+    Example:
+        cells = load_notebook("tutorial.ipynb")
+        documents = notebook_to_documents(cells)
+    """
     ATX = re.compile(r"^ {0,3}#{1,6}(?:[ \t]+|$)")
     SETEXT = re.compile(r"^ {0,3}(?:=+|-+)[ \t]*$")
+    LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 
     def is_heading(line1: str, line2: str) -> bool:
         return ATX.match(line1) or SETEXT.match(line2)
     
+    def extract_links(text: str):
+        base_url = "https://docs.pytorch.org/tutorials/beginner/basics/"
+        matches = LINK.findall(text)
+        texts_and_urls = [{"title": link_text, "url": urljoin(base_url, url)} for link_text, url in matches]
+        text_without_markdown = LINK.sub(r"\1", text)
+
+        return texts_and_urls, text_without_markdown
+    
     documents = []
     texts = []
+    text = ""
     title = ""
     source = ""
     indices = []
+    links = []
     
     for cell in cells:
         indices.append(cell['cell_index'])
@@ -130,19 +180,22 @@ def notebook_to_documents(cells):
                 continue
             
             if i+1 == len(lines) and len(title) > 0:
-                # Last line so append and break
+                # Last line so append, strip text, and append links
                 texts.append(line)
+                links, text = extract_links(' '.join(texts).strip().replace("`", ""))
                 continue
             
-            line_is_heading = cell['cell_type'] == 'markdown' and is_heading(line, lines[i+1])
+            is_markdown = cell['cell_type'] == 'markdown'
+            line_is_heading = is_markdown and is_heading(line, lines[i+1])
             
             if len(title) > 0 and line_is_heading:
                 # New header so create new document
                 documents.append({
-                    'text': '\n\n'.join(texts).strip("\n"),
+                    'text': text,
                     'title': title,
                     'source': source,
-                    'cell_indices': indices
+                    'cell_indices': indices,
+                    'links': links
                 })
                 texts = []
                 title = ""
@@ -162,9 +215,12 @@ def notebook_to_documents(cells):
             texts.append(line)
             
     documents.append({
-        'text': '\n\n'.join(texts).strip("\n"),
+        'text': text,
         'title': title,
         'source': source,
-        'cell_indices': indices
+        'cell_indices': indices,
+        'links': links
     })
-    return documents
+    
+    # Return documents only with text
+    return [document for document in documents if document.get('text') != ""]
