@@ -175,9 +175,11 @@ def notebook_to_documents(cells):
             if len(indices) < 1:
                 indices.append(cell['cell_index'])
                 
-            if SETEXT.match(line):
-                # Skip header markup lines
+            if SETEXT.match(line) or line == '' or line == '\n':
+                # Skip header markup lines and empty lines
                 continue
+            
+            is_markdown = cell['cell_type'] == 'markdown'
             
             if i+1 == len(lines) and len(title) > 0:
                 # Last line so append line
@@ -187,39 +189,46 @@ def notebook_to_documents(cells):
                 if is_markdown:
                     # Replace ticks and stars while stripping hyphens and whitespaces
                     joined = ' '.join(texts).replace("`", "").replace("*", "").strip("-").strip()
-                    only_links = re.fullmatch(rf"(?:\s*{LINK}\s*)+", joined) is not None
-                    
+                    only_links = re.fullmatch(
+                        rf"(?:\s*{LINK.pattern}\s*)+",
+                        joined
+                    ) is not None
+
                     # Add "Relevant Links" to text if only hyperlinks
                     if only_links:
                         new_links, _ = extract_links(joined)
                         new_text = " Relevant Links"
                     else:
-                        new_links, new_text = extract_links()
+                        new_links, new_text = extract_links(joined)
                         
                     links += new_links
                     text += new_text
-                        
                 else:
-                    text += ' '.join(texts) 
-                    
+                    start_line = "\n\n```python\n"
+                    end_line = "\n```\n\n"
+                    text += start_line + '\n'.join(texts) + end_line
+                
+                # Reset saved texts
+                texts = []    
                 continue
             
-            is_markdown = cell['cell_type'] == 'markdown'
             line_is_heading = is_markdown and is_heading(line, lines[i+1])
             
             if len(title) > 0 and line_is_heading:
-                # New header so create new document
+                # New header so create new document and reset all values
                 documents.append({
-                    'text': text,
+                    'text': text.strip('\n'),
                     'title': title,
                     'source': source,
                     'cell_indices': indices,
                     'links': links
                 })
                 texts = []
+                text = ""
                 title = ""
                 source = ""
                 indices = []
+                links = []
             
             if line_is_heading:
                 # Add the header and skip to new line
@@ -232,9 +241,9 @@ def notebook_to_documents(cells):
                 continue
 
             texts.append(line)
-            
+          
     documents.append({
-        'text': text,
+        'text': text.strip('\n'),
         'title': title,
         'source': source,
         'cell_indices': indices,
