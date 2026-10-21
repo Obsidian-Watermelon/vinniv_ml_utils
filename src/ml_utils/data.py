@@ -180,9 +180,24 @@ def notebook_to_documents(cells):
                 continue
             
             if i+1 == len(lines) and len(title) > 0:
-                # Last line so append, strip text, and append links
+                # Last line so append line
                 texts.append(line)
-                links, text = extract_links(' '.join(texts).strip().replace("`", ""))
+                
+                # If markdown strip text and append links
+                if is_markdown:
+                    # Replace ticks and stars while stripping hyphens and whitespaces
+                    joined = ' '.join(texts).replace("`", "").replace("*", "").strip("-").strip()
+                    only_links = re.fullmatch(rf"(?:\s*{LINK}\s*)+", joined) is not None
+                    
+                    # Add "Relevant Links" to text if only hyperlinks
+                    if only_links:
+                        links, _ += extract_links(joined)
+                        text += " Relevant Links"
+                    else:
+                        links, text += extract_links()
+                else:
+                    text += ' '.join(texts) 
+                    
                 continue
             
             is_markdown = cell['cell_type'] == 'markdown'
