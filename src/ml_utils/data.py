@@ -191,10 +191,14 @@ def notebook_to_documents(cells):
                     
                     # Add "Relevant Links" to text if only hyperlinks
                     if only_links:
-                        links, _ += extract_links(joined)
-                        text += " Relevant Links"
+                        new_links, _ = extract_links(joined)
+                        new_text = " Relevant Links"
                     else:
-                        links, text += extract_links()
+                        new_links, new_text = extract_links()
+                        
+                    links += new_links
+                    text += new_text
+                        
                 else:
                     text += ' '.join(texts) 
                     
