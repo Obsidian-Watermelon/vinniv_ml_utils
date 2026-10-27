@@ -6,6 +6,7 @@ import torch
 from torch import nn
 from tqdm.auto import tqdm
 from IPython.display import Markdown, display
+from timeit import default_timer as timer
 
 
 def plot_loss_curves(results: dict) -> tuple:
@@ -165,3 +166,67 @@ def get_best_result(results: dict) -> dict:
 def display_markdown(text: str):
     """Display input text as markdown text"""
     display(Markdown(text))
+
+
+def generate_answers_for_queries(
+    queries: list[str],
+    rag: nn.Module,
+    llm: nn.Module,
+    top_k: int = 4,
+    threshold: float = 0.4,
+) -> list[str]:
+    """
+    Generate answers for a list of queries using a RAG pipeline.
+
+    For each query, retrieve relevant documents using the RAG model,
+    generate an answer using the LLM, display the query and answer,
+    and report the time taken for retrieval and generation.
+
+    Args:
+        queries: Questions to answer.
+        rag: RAG model providing a `retrieve()` method.
+        llm: Language model providing a `generate_answer()` method.
+        top_k: Maximum number of documents to retrieve per query.
+        threshold: Minimum similarity score for retrieved documents.
+
+    Returns:
+        A list of generated answers in the same order as the queries.
+
+    Raises:
+        ValueError: If `top_k` is less than 1 or `threshold` is outside
+            the range [0, 1].
+    """
+    if top_k < 1:
+        raise ValueError("top_k must be at least 1.")
+
+    if not 0.0 <= threshold <= 1.0:
+        raise ValueError("threshold must be between 0.0 and 1.0.")
+
+    answers: list[str] = []
+
+    progress_bar = tqdm(
+        queries,
+        desc="Generating answers",
+        unit="query",
+    )
+
+    for i, query in enumerate(progress_bar, start=1):
+        display_markdown(f"### Query {i}: {query}")
+
+        start = timer()
+
+        retrieved_documents = rag.retrieve(
+            query,
+            top_k=top_k,
+            threshold=threshold,
+        )
+        answer = llm.generate_answer(query, retrieved_documents)
+
+        elapsed = timer() - start
+
+        display_markdown(answer)
+        tqdm.write(f"Time to generate answer: {elapsed:.3f} sec")
+
+        answers.append(answer)
+
+    return answers

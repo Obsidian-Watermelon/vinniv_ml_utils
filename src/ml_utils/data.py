@@ -3,6 +3,7 @@ import torch, nbformat, re
 from torchtext import data
 from pathlib import Path
 from urllib.parse import urljoin
+from tqdm.auto import tqdm
 
 
 def handle_cuda_as_device() -> torch.device:
@@ -105,7 +106,7 @@ def load_notebook(path):
 
     return documents
 
-def notebook_to_documents(cells):
+def notebook_to_documents(cells, base_url="https://docs.pytorch.org/tutorials/beginner/basics/"):
     """
     Convert extracted notebook cells into section-based documents for RAG.
 
@@ -152,7 +153,6 @@ def notebook_to_documents(cells):
         return ATX.match(line1) or SETEXT.match(line2)
     
     def extract_links(text: str):
-        base_url = "https://docs.pytorch.org/tutorials/beginner/basics/"
         matches = LINK.findall(text)
         texts_and_urls = [{"title": link_text, "url": urljoin(base_url, url)} for link_text, url in matches]
         text_without_markdown = LINK.sub(r"\1", text)
@@ -167,7 +167,13 @@ def notebook_to_documents(cells):
     indices = []
     links = []
     
-    for cell in cells:
+    progress_bar = tqdm(
+        cells,
+        desc="Converting notebook to documents",
+        leave=False,
+    )
+    
+    for cell in progress_bar:
         indices.append(cell['cell_index'])
         lines = cell['text'].splitlines()
         
